@@ -118,7 +118,7 @@ function App() {
             {isLoading ? (
               <div className="flex items-center justify-center py-6 sm:py-8">
                 <div className="w-6 sm:w-8 h-6 sm:h-8 border-4 border-pink-200 border-t-pink-500 rounded-full animate-spin"></div>
-              </div>
+      </div>
             ) : (
               <p className="text-gray-700 leading-relaxed text-base sm:text-lg">
                 {explanation}

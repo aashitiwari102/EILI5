@@ -1,5 +1,13 @@
 require('dotenv').config();
 
+// Use node-fetch v2 for compatibility, fallback to global fetch if available (Node 18+)
+let fetch;
+try {
+  fetch = global.fetch || require('node-fetch');
+} catch (e) {
+  fetch = require('node-fetch');
+}
+
 // Ensure required environment variables are loaded
 const requiredEnv = ['COHERE_API_KEY', 'NEWS_API_KEY'];
 const missing = requiredEnv.filter((key) => !process.env[key]);
@@ -10,14 +18,9 @@ if (missing.length > 0) {
 
 const express = require('express');
 const cors = require('cors');
-const fetch = require('node-fetch');
-const cohere = require('cohere-ai');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-
-// Initialize Cohere
-cohere.init(process.env.COHERE_API_KEY);
 
 // Middleware
 app.use(cors({
@@ -75,25 +78,33 @@ app.post('/api/explain', async (req, res) => {
       });
     }
 
-    // --- Cohere API call with error handling ---
+    // --- Cohere REST API call with error handling ---
     let explanation;
     try {
       const prompt = `Explain this like I'm 5: ${headline}. Make it super simple, friendly, and maybe a little silly.`;
       console.log('[EILI5] Cohere prompt:', prompt);
-      const cohereResponse = await cohere.generate({
-        model: 'command-r-plus',
-        prompt: prompt,
-        max_tokens: 300,
-        temperature: 0.7,
-        k: 0,
-        stop_sequences: [],
-        return_likelihoods: 'NONE'
+      const cohereResponse = await fetch('https://api.cohere.ai/v1/generate', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.COHERE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'command-r-plus',
+          prompt: prompt,
+          max_tokens: 300,
+          temperature: 0.7,
+          k: 0,
+          stop_sequences: [],
+          return_likelihoods: 'NONE'
+        })
       });
-      if (!cohereResponse.body || !cohereResponse.body.generations || cohereResponse.body.generations.length === 0) {
-        console.error('[EILI5] Cohere response missing generations:', cohereResponse.body);
+      const cohereData = await cohereResponse.json();
+      if (!cohereResponse.ok || !cohereData.generations || cohereData.generations.length === 0) {
+        console.error('[EILI5] Cohere response missing generations:', cohereData);
         throw new Error('No response from Cohere API');
       }
-      explanation = cohereResponse.body.generations[0].text.trim();
+      explanation = cohereData.generations[0].text.trim();
       console.log(`[EILI5] Cohere explanation:`, explanation);
     } catch (err) {
       console.error('[EILI5] Cohere API error:', err);
